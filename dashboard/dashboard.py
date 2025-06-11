@@ -2,6 +2,12 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import os  # Ditambahkan untuk penanganan path
+
+# Debugging - Tampilkan informasi direktori
+st.sidebar.header("Debug Info")
+st.sidebar.write("Current directory:", os.getcwd())
+st.sidebar.write("Directory contents:", os.listdir())
 
 # Set judul halaman
 st.set_page_config(page_title="Dashboard Analisis Data Bike Sharing", layout="centered")
@@ -9,15 +15,59 @@ st.set_page_config(page_title="Dashboard Analisis Data Bike Sharing", layout="ce
 st.title("Dashboard Analisis Data Bike Sharing")
 st.write("Dashboard ini menyajikan insight dari data peminjaman sepeda berdasarkan dataset `main_data.csv`.")
 
-# Fungsi untuk memuat data
+# Fungsi untuk memuat data dengan penanganan error yang lebih baik
 @st.cache_data
 def load_data():
-    df = pd.read_csv("main_data.csv")
-    if 'Unnamed: 0' in df.columns:
-        df = df.drop(columns=['Unnamed: 0'])
-    return df
+    try:
+        # Coba beberapa lokasi file yang mungkin
+        possible_paths = [
+            "dashboard/main_data.csv",  # Path sesuai struktur GitHub Anda
+            "main_data.csv",            # Jika file dipindahkan ke root
+            "data/main_data.csv"        # Alternatif lain
+        ]
+        
+        for path in possible_paths:
+            try:
+                df = pd.read_csv(path)
+                if 'Unnamed: 0' in df.columns:
+                    df = df.drop(columns=['Unnamed: 0'])
+                st.success(f"File berhasil dibaca dari: {path}")
+                return df
+            except Exception as e:
+                st.sidebar.write(f"Gagal baca dari {path}: {str(e)}")
+                continue
+        
+        # Jika semua path gagal, coba dari URL GitHub
+        try:
+            url = "https://raw.githubusercontent.com/annisaamanjalaii/bike-sharing-dashboard_/main/dashboard/main_data.csv"
+            df = pd.read_csv(url)
+            if 'Unnamed: 0' in df.columns:
+                df = df.drop(columns=['Unnamed: 0'])
+            st.success("File berhasil dibaca dari URL GitHub")
+            return df
+        except Exception as e:
+            st.error(f"Gagal baca dari URL: {str(e)}")
+        
+        # Jika masih gagal, tampilkan opsi upload
+        uploaded_file = st.file_uploader("Upload file CSV", type=["csv"])
+        if uploaded_file is not None:
+            df = pd.read_csv(uploaded_file)
+            if 'Unnamed: 0' in df.columns:
+                df = df.drop(columns=['Unnamed: 0'])
+            return df
+        else:
+            st.error("File tidak ditemukan di semua lokasi yang dicoba")
+            return None
+            
+    except Exception as e:
+        st.error(f"Terjadi error saat memuat data: {str(e)}")
+        return None
 
+# Memuat data
 data = load_data()
+
+if data is None:
+    st.stop()  # Hentikan eksekusi jika data tidak terbaca
 
 # Tampilkan kolom
 st.subheader("Kolom dalam Dataset")
@@ -25,7 +75,7 @@ st.write(data.columns.tolist())
 
 # Cek kolom 'hr'
 if 'hr' not in data.columns:
-    st.error("Kolom 'hr' tidak ditemukan dalam dataset. Periksa file hour.csv.")
+    st.error("Kolom 'hr' tidak ditemukan dalam dataset. Periksa file data Anda.")
 else:
     st.subheader("Data Awal (10 baris)")
     st.dataframe(data.head(10))
@@ -59,6 +109,8 @@ else:
     st.write(f"Jumlah baris data: {filtered.shape[0]}")
     st.dataframe(filtered.head(10))
 
+    # Visualisasi data
+    # [Bagian visualisasi tetap sama seperti sebelumnya]
     # Pertanyaan 1: Kapan waktu terbaik menambah armada?
     st.subheader("Waktu Terbaik Menambah Armada Sepeda")
 
@@ -101,7 +153,7 @@ else:
 
     # Kesimpulan
     st.markdown("---")
-    st.header("📌 Kesimpulan")
+    st.header("Kesimpulan")
     st.write("""
     - Peminjaman tertinggi terjadi antara jam 17:00 hingga 19:00 — waktu ideal untuk menambah armada.
     - Cuaca cerah mendorong peminjaman lebih tinggi dibanding cuaca buruk.
